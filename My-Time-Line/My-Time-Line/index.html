@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f6df5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My Time line">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>My Time line</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#1d2233;--sub:#7a8199;--line:#e6e9f2;--pt:#4f6df5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14161f;--card:#1e212e;--tx:#eceffa;--sub:#8f97b3;--line:#2c3040;--pt:#7d93ff}}
+:root[data-theme="dark"]{--bg:#14161f;--card:#1e212e;--tx:#eceffa;--sub:#8f97b3;--line:#2c3040;--pt:#7d93ff}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Pretendard","Noto Sans KR",system-ui,sans-serif;line-height:1.5}
+.app{max-width:520px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:8px}
+h2{font-size:16px;margin:0}
+button,input,select{font:inherit;color:inherit}
+button{border:0;background:var(--line);border-radius:10px;padding:6px 10px;cursor:pointer}
+button.pt{background:var(--pt);color:#fff}
+input[type=text],select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button{flex:1;padding:10px}.tabs .on{background:var(--pt);color:#fff}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:13px}
+.cal .d{padding:6px 0;border-radius:10px;background:none;min-height:58px}
+.cal .d.sel{box-shadow:inset 0 0 0 2.5px var(--pt);font-weight:700}.cal .d.today{font-weight:700;color:var(--pt)}.left{font-size:10px;color:var(--sub);min-height:13px;margin-top:1px}
+.dots{display:flex;justify-content:center;gap:2px;margin-top:2px;min-height:6px}.dots i{width:8px;height:8px;border-radius:50%}
+.task{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.task:last-child{border:0}.task.done .t{text-decoration:line-through;color:var(--sub)}
+.chk{width:30px;height:30px;border-radius:50%;border:2.5px solid;background:none;padding:0;font-size:16px;line-height:1;color:#fff;flex:none}
+.t{flex:1;overflow-wrap:anywhere}.bar{width:5px;align-self:stretch;border-radius:3px}
+.sm{font-size:12px;color:var(--sub)}
+.gh{display:flex;align-items:center;gap:8px;margin:14px 0 2px;padding:6px 10px;border-radius:10px;font-weight:700;font-size:14px}
+.gh:first-of-type{margin-top:4px}.gh span{margin-left:auto;font-weight:500;font-size:12px;opacity:.8}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:13px;color:#fff;margin:0 4px 6px 0}
+.sw{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin:8px 0}
+.sw button{aspect-ratio:1;border-radius:50%;padding:0;border:3px solid transparent}.sw button.on{border-color:var(--tx)}
+input[type=color]{width:100%;height:40px;border:1px solid var(--line);border-radius:10px;background:none;padding:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:20px">My Time line</h2><span class="sm" id="prog"></span></div>
+  <div class="tabs" id="tabs"></div>
+  <div id="view"></div>
+</div>
+<script>
+const K='todoPlanner.v1';
+const PAL=['#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e','#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1','#8b5cf6','#d946ef','#ec4899','#f43f5e','#78716c','#64748b','#a16207','#0f766e','#1d4ed8','#7e22ce','#be185d','#111827'];
+const DAYS=['일','월','화','수','목','금','토'];
+let S={cats:[{id:'c1',name:'공부',color:'#3b82f6'},{id:'c2',name:'운동',color:'#22c55e'}],todos:[],routines:[]};
+try{const r=localStorage.getItem(K);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=iso(new Date());let sel=today,tab='todo',cur=new Date(),newColor=PAL[10];cur.setDate(1);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cat=id=>S.cats.find(c=>c.id===id)||{name:'기타',color:'#999'};
+function applyRoutines(date){
+  const wd=new Date(date+'T00:00:00').getDay();
+  S.routines.forEach(r=>{if(r.days.includes(wd)&&!S.todos.some(t=>t.date===date&&t.rid===r.id))S.todos.push({id:uid(),text:r.text,cat:r.cat,date,done:false,rid:r.id})});
+}
+function render(){
+  document.getElementById('tabs').innerHTML=[['todo','할 일'],['routine','루틴'],['cat','카테고리']].map(([k,n])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';render()">${n}</button>`).join('');
+  document.getElementById('view').innerHTML={todo:vTodo,routine:vRoutine,cat:vCat}[tab]();
+  const td=S.todos.filter(t=>t.date===today);document.getElementById('prog').textContent=td.length?`오늘 ${td.filter(t=>t.done).length}/${td.length} 완료`:'';
+  save();
+}
+function vTodo(){
+  applyRoutines(sel);
+  const y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1).getDay(),n=new Date(y,m+1,0).getDate();
+  let cells=DAYS.map(d=>`<div class="sm">${d}</div>`).join('')+'<div></div>'.repeat(first);
+  for(let d=1;d<=n;d++){const ds=iso(new Date(y,m,d));const day=S.todos.filter(t=>t.date===ds),left=day.filter(t=>!t.done).length;const gs=[...new Set(day.map(t=>t.cat))].slice(0,4).map(id=>{const it=day.filter(t=>t.cat===id);return{c:cat(id).color,o:.25+.75*it.filter(t=>t.done).length/it.length}});
+    cells+=`<button class="d ${ds===sel?'sel':''} ${ds===today?'today':''}" onclick="sel='${ds}';render()">${d}<div class="dots">${gs.map(g=>`<i style="background:${g.c};opacity:${g.o}"></i>`).join('')}</div><div class="left">${day.length?(left?left+'개 남음':'✓'):''}</div></button>`}
+  const list=S.todos.filter(t=>t.date===sel);const dn=list.filter(t=>t.done).length;
+  return `<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:8px"><button onclick="cur.setMonth(cur.getMonth()-1);render()">‹</button><h2>${y}년 ${m+1}월</h2><button onclick="cur.setMonth(cur.getMonth()+1);render()">›</button></div><div class="cal">${cells}</div></div>
+  <div class="card"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2>${m+1}월 ${+sel.slice(8)}일 할 일</h2><span class="sm">${list.length?dn+'/'+list.length+' 완료':''}</span></div>
+  <div class="row" style="margin-bottom:8px"><select id="nc" onchange="S.lastCat=this.value;save()">${S.cats.map(c=>`<option value="${c.id}" ${c.id===S.lastCat?'selected':''}>${esc(c.name)}</option>`).join('')}</select><input type="text" id="nt" style="flex:1" placeholder="할 일을 입력하세요" onkeydown="if(event.key==='Enter')addT()"><button class="pt" onclick="addT()">추가</button></div>
+  ${list.length?groups(list):'<p class="sm">아직 할 일이 없어요. 위에서 추가해 보세요.</p>'}</div>`;
+}
+function groups(list){ // 소카테고리별로 묶어서 표시
+  const ids=[...S.cats.map(c=>c.id),...new Set(list.map(t=>t.cat).filter(i=>!S.cats.some(c=>c.id===i)))];
+  const dn=i=>{const f=list.filter(t=>t.cat===i);return f.length&&f.every(t=>t.done)?1:0};
+  return ids.slice().sort((a,b)=>dn(a)-dn(b)).map(id=>{const items=list.filter(t=>t.cat===id);if(!items.length)return '';const c=cat(id);
+    return `<div class="gh" style="background:${c.color}22;color:${c.color}"><i style="width:10px;height:10px;border-radius:50%;background:${c.color}"></i>${esc(c.name)}<span>${items.filter(t=>t.done).length}/${items.length}</span></div>`+
+    [...items.filter(t=>!t.done),...items.filter(t=>t.done)].map(t=>`<div class="task ${t.done?'done':''}"><button class="chk" style="border-color:${c.color};background:${t.done?c.color:'none'}" onclick="tog('${t.id}')" aria-label="완료 체크">${t.done?'✓':''}</button><div class="t">${esc(t.text)}</div><button onclick="del('${t.id}')" aria-label="삭제">✕</button></div>`).join('')}).join('');
+}
+function vRoutine(){
+  return `<div class="card"><h2 style="margin-bottom:8px">루틴 만들기</h2><div class="row" style="margin-bottom:8px"><select id="rc" onchange="S.lastCat=this.value;save()">${S.cats.map(c=>`<option value="${c.id}" ${c.id===S.lastCat?'selected':''}>${esc(c.name)}</option>`).join('')}</select><input type="text" id="rt" style="flex:1" placeholder="예: 영어 단어 30개"></div>
+  <div class="row" style="flex-wrap:wrap;margin-bottom:10px">${DAYS.map((d,i)=>`<label class="sm"><input type="checkbox" class="rd" value="${i}"> ${d}</label>`).join('')}</div><button class="pt" onclick="addR()">루틴 추가</button></div>
+  <div class="card"><h2 style="margin-bottom:8px">내 루틴</h2>${S.routines.length?S.routines.map(r=>`<div class="task"><span class="bar" style="background:${cat(r.cat).color}"></span><div class="t">${esc(r.text)}<div class="sm">매주 ${r.days.map(d=>DAYS[d]).join(', ')}</div></div><button onclick="S.routines=S.routines.filter(x=>x.id!=='${r.id}');render()">✕</button></div>`).join(''):'<p class="sm">요일을 골라 자주 하는 일을 루틴으로 등록해 보세요.</p>'}</div>`;
+}
+function vCat(){
+  return `<div class="card"><h2 style="margin-bottom:8px">내 카테고리</h2>${S.cats.map(c=>`<span class="chip" style="background:${c.color}">${esc(c.name)} <b style="cursor:pointer" onclick="delC('${c.id}')">✕</b></span>`).join('')}</div>
+  <div class="card"><h2>새 카테고리</h2><input type="text" id="cn" style="width:100%;margin-top:8px" placeholder="이름 (예: 약속, 업무)"><div class="sw">${PAL.map(p=>`<button class="${p===newColor?'on':''}" style="background:${p}" onclick="newColor='${p}';keepName();render()" aria-label="${p}"></button>`).join('')}</div>
+  <div class="sm" style="margin-bottom:4px">원하는 색을 직접 고를 수도 있어요</div><input type="color" value="${newColor}" onchange="newColor=this.value;keepName();render()"><button class="pt" style="width:100%;margin-top:10px;padding:10px" onclick="addC()">카테고리 추가</button></div>`;
+}
+let nameBuf='';
+function keepName(){const e=document.getElementById('cn');if(e)nameBuf=e.value}
+function addT(){const i=document.getElementById('nt'),t=i.value.trim();if(!t)return;S.todos.push({id:uid(),text:t,cat:document.getElementById('nc').value,date:sel,done:false});render()}
+function tog(id){const t=S.todos.find(x=>x.id===id);t.done=!t.done;render()}
+function del(id){S.todos=S.todos.filter(x=>x.id!==id);render()}
+function addR(){const t=document.getElementById('rt').value.trim(),ds=[...document.querySelectorAll('.rd:checked')].map(x=>+x.value);if(!t||!ds.length)return;S.routines.push({id:uid(),text:t,cat:document.getElementById('rc').value,days:ds});render()}
+function addC(){const n=document.getElementById('cn').value.trim()||nameBuf.trim();if(!n)return;S.cats.push({id:uid(),name:n,color:newColor});nameBuf='';render()}
+function delC(id){if(S.cats.length>1){S.cats=S.cats.filter(c=>c.id!==id);render()}}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();
+</script>
+</body>
+</html>
